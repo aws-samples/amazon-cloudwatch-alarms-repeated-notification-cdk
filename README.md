@@ -1,41 +1,41 @@
 ## How to Enable Amazon CloudWatch Alarms to Send Repeated Notifications
 
-Amazon CloudWatch Alarms is natively integrated with Amazon CloudWatch metrics. Many AWS services send metrics to CloudWatch, and AWS also offers many approaches allowing you to emit your applications’ metrics as custom metrics. CloudWatch Alarms allow you to monitor the changes on the metrics when crossing a static threshold or falling out of an anomaly detection band. It also allows you to monitor the calculated result of multiple alarms. CloudWatch Alarms then automatically initiate actions when its state changes between OK, ALARM and INSUFFICIENT_DATA.
+Amazon CloudWatch Alarms is natively integrated with Amazon CloudWatch metrics. Many AWS services send metrics to CloudWatch, and AWS also offers many approaches that let you emit your applications’ metrics as custom metrics. CloudWatch Alarms let you monitor the metrics changes when crossing a static threshold or falling out of an anomaly detection band. Furthermore, it lets you monitor the calculated result of multiple alarms. Then, CloudWatch Alarms automatically initiate actions when its state changes between OK, ALARM, and INSUFFICIENT_DATA. 
 
-The most commonly used alarm action is to notify person-of-interest or trigger downstream automation by sending a message to an Amazon Simple Notification Service (SNS) Topic. CloudWatch Alarms are designed to only invoke the alarm actions when state change happens. The only exception is for an Autoscaling action, where the scaling action will keep being invoked periodically when the alarm remains in the state configured for the action.
+The most commonly used alarm action is to notify a person-of-interest or trigger downstream automation by sending a message to an Amazon Simple Notification Service (SNS) Topic. CloudWatch Alarms are designed to invoke only the alarm actions when a state change happens. The one exception is Autoscaling actions, where the scaling action will keep being invoked periodically when the alarm remains in the state that was configured for the action.
 
-There are scenarios where you may find useful to have repeated notification on certain critical alarms so that the corresponding team is alerted to take actions promptly. In this blog post, I will show you how to use Amazon EventBridge, AWS Step Function and AWS Lambda to enable repeated alarm notification on selected CloudWatch Alarms. I will also discuss the other customization use cases can be achieved on alarm state change using the same solution model.
+There are scenarios where you may find it useful to have repeated notifications on certain critical alarms so that the corresponding team is alerted to take actions promptly. In this post, I will show you how to use Amazon EventBridge, AWS Step Function, and AWS Lambda to enable repeated alarm notification on selected CloudWatch Alarms. I will also discuss the other customization use cases that can be achieved with alarm state change using the same solution model.
 
 ## Overview
 
 Since 2019, Amazon EventBridge has integrated with Amazon CloudWatch so that when a CloudWatch alarm’s state changes, a corresponding [CloudWatch alarm state change event](https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/cloudwatch-and-eventbridge.html) is sent to the EventBridge service. You can create an EventBridge rule with customized rule pattern to capture
 
-* all alarms’ stage change events
-* alarms transitions to particular state
-* stage change events of alarm with certain prefixed name
+* all alarms’ stage change events，
+* the alarms transitions to particular states，
+* and state change events of alarms with certain prefixed names
 
-With a matched event, the rule invokes downstream automations to process the alarm’s state change event. This solution uses an AWS Step function to orchestrate repeated alarm notification workflow.
+Matched events mean that the rule invokes downstream automations to process the alarm’s state change event. This solution uses an AWS Step function to orchestrate repeated alarm notification workflow.
 
-In this solution, we will enable repeated alarm notification by applying a specific tag on the CloudWatch alarm resources. Within the Step Function, a Lambda function can query the tags of the triggered alarm and only process further when the specific tag <key:value> is present. This approach also gives you capability of creating a centralized view on all alarms with repeated alarm notification enabled by creating a tag-based [resource group](https://docs.aws.amazon.com/ARG/latest/userguide/resource-groups.html#resource-groups-intro). The resource group is included as an optional part of this solution.
+In this solution, we will enable repeated alarm notification by applying a specific tag on the CloudWatch alarm resources. Within the Step Function, a Lambda function can query the tags of the triggered alarm and only process further when the specific tag <key:value> is present. Moreover, this approach lets you create a centralized view of all of the alarms with repeated alarm notification enabled by creating a tag-based [resource group](https://docs.aws.amazon.com/ARG/latest/userguide/resource-groups.html#resource-groups-intro). The resource group is included as an optional part of this solution.
 
 ## Solution Architecture
 
-This solution is deployed as an AWS CDK application which deploys the resources highlighted within blue rectangle in Figure 1 to your AWS account. These resources are:
+This solution is deployed as an [AWS Cloud Development Kit (CDK)](https://aws.amazon.com/cdk/) application that deploys the resources highlighted within the blue rectangle in the following diagram to your AWS account. These resources are:
 
-* An EventBridge rule to capture all alarms’ state change events
-* A Lambda function to check the alarm’s tag, describe alarm’s current state and send notification to existing SNS alarm actions on the alarm
-* A Step Function state machine with a wait task, the above Lambda task and a choice task
-* Two IAM roles used for EventBridge to invoke step function and for Lambda to perform required actions respectively
-* (Optional) A tag-based resource group which incudes all CloudWatch alarms with the feature enablement tag
+*	An EventBridge rule to capture all of the alarms’ state change events. 
+*	A Lambda function to check the alarm’s tag, describe the alarm’s current state, and send notifications to existing SNS alarm actions on the alarm.
+*	A Step Function state machine with a wait task, the above Lambda task, and a choice task.
+*	Two IAM roles used for EventBridge to invoke the step function and for Lambda to perform the required actions respectively.
+*	(Optional) A tag-based resource group including all of the CloudWatch alarms with the feature enablement tag.
 
-![Figure 1: Solution Diagram](images/Solution_Architecture_eb.png)
+![Solution Diagram](images/Solution_Architecture_eb.png)
 
-This solution works as below:
-1. CloudWatch alarm is triggered and goes into ALARM state
-2. CloudWatch alarm sends the first alarm notification to associated SNS alarm actions.
-3. CloudWatch Alarms service sends an alarm state change event which triggers the EventBridge rule. The rule pattern used is shown in Figure 2, which captures all alarms’ state change to ALARM event.
+This solution works as follows:
+1。	CloudWatch alarm is triggered and goes into the ALARM state.
+2。	CloudWatch alarm sends the first alarm notification to the associated SNS alarm actions.
+3.	CloudWatch Alarms service sends an alarm state change event which triggers the EventBridge rule. The rule pattern used is shown as follows, which captures all of the alarms’ state changes to the ALARM event.
 
-![Figure 2. EventBridge Rule Pattern](images/CloudWatch_Alarm_state_Change_event_pattern.png)
+![EventBridge Rule Pattern](images/CloudWatch_Alarm_state_Change_event_pattern.png)
 
 4.	With a match event, the EventBridge rule invokes the Step Function target
 5.	Once the Step Function starts execution, it first enters a Wait state (“Wait X Seconds” in Figure 3). The wait period can be configured in the CDK application and passed to the state machine definition.
@@ -49,14 +49,12 @@ This solution works as below:
   * If alarm state is ALARM, go to Wait state again
   * Otherwise, the step function execution ends
 
-![Figure 3: Repeated Alarm Step Function Definition](images/stepfunctions_graph.png)
+![Repeated Alarm Step Function Definition](images/stepfunctions_graph.png)
 
 With the above workflow, the repeated notification for an alarm stops when:
 * Alarm transitions to non-ALARM state
 * Alarm is deleted
 * Specific tag is removed from the alarm
-
-
 
 ## Procedures
 
@@ -73,9 +71,10 @@ Now, let’s deploy the solution and see how it works.
 Before you can deploy a CDK application, make sure you have the AWS CDK CLI installed and AWS account bootstrapped as describe [here](https://docs.aws.amazon.com/cdk/latest/guide/getting_started.html). Then run the following command from your terminal to download the solution code and deploy.
 
 ```
-git clone https://gitlab.aws.dev/srl/aws-repeated-alarm-notification.git
-cd aws-repeated-alarm-notification
+git clone https://github.com/aws-samples/amazon-cloudwatch-alarms-repeated-notification-cdk.git
+cd amazon-cloudwatch-alarms-repeated-notification-cdk
 npm install
+npm run build
 cdk bootstrap #Required for first time CDK deployment
 cdk deploy --parameters RepeatedNotificationPeriod=300 --parameters TagForRepeatedNotification=RepeatedAlarm:true --parameters RequireResourceGroup=false
 ```
@@ -148,7 +147,7 @@ In addition, this post mainly shows you how to use the native alarm state change
 To avoid additional infrastructure costs from the examples described in this posy, be sure to delete all resources created. You can simply clean up the resource by running the follow command:
 
 ```
-cd aws-repeated-alarm-notification-cdk
+cd amazon-cloudwatch-alarms-repeated-notification-cdk
 cdk destroy
 ```
 
