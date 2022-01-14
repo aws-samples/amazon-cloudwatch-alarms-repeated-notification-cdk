@@ -31,6 +31,7 @@ This solution is deployed as an [AWS Cloud Development Kit (CDK)](https://aws.am
 ![Solution Diagram](images/Solution_Architecture_eb.png)
 
 This solution works as follows:
+
 1。	CloudWatch alarm is triggered and goes into the ALARM state.
 2。	CloudWatch alarm sends the first alarm notification to the associated SNS alarm actions.
 3.	CloudWatch Alarms service sends an alarm state change event which triggers the EventBridge rule. The rule pattern used is shown as follows, which captures all of the alarms’ state changes to the ALARM event.
