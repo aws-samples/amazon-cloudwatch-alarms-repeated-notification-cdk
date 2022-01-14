@@ -110,7 +110,6 @@ aws cloudwatch set-alarm-state --alarm-name <alarm_name> --state-value OK --stat
 ```
 
 * Wait for the next alarm evaluation. For a standard alarm, it will re-evaluate within 1 min and transition to its actual state.
-![Repeated Alarm Test](images/repeated_alarm_test.png)
 * Verify you receive ALARM notification every 5 mins. The repeated notification will have subject similar as below
 ![Repeated Notification Email Title](images/Repeated_notification_email_title.png)
 
