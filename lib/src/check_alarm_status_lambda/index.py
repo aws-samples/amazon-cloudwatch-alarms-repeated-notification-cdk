@@ -37,7 +37,8 @@ def lambda_handler(event, context):
         logger.info(alarm_tags)
         if check_if_repeated_alarm_enabled(alarm_tags.get("Tags")):
             alarm_response = CW_CLIENT.describe_alarms(
-                AlarmNames=[alarm_name]
+                AlarmNames=[alarm_name],
+                AlarmTypes=["CompositeAlarm", "MetricAlarm"]
             )
             logger.info(alarm_response)
 
